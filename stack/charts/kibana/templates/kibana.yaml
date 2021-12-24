@@ -1,0 +1,62 @@
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: {{ template "kibana.name" . }}
+spec:
+  version: {{ .Values.version }}
+  count: {{ .Values.replicas }}
+  {{- if .Values.elasticsearch.managedbyeck }}
+  elasticsearchRef:
+    name: {{ .Values.elasticsearch.name }}
+    namespace: {{ .Values.elasticsearch.namespace }}
+  {{ else }}
+  config:
+    elasticsearch.hosts:
+      - {{ .Values.elasticsearch.endpoint }}
+    elasticsearch.username: elastic
+  secureSettings:
+    - secretName: {{ .Values.elasticsearch.kibana.secretcredentials }}
+  {{- end }}
+  {{- if .Values.elasticsearch.certificate.enabled }}
+  podTemplate:
+    spec:
+      volumes:
+        - name: elasticsearch-certs
+          secret:
+            secretName:  {{ .Values.elasticsearch.certs.secret }}
+      containers:
+        - name: kibana
+          volumeMounts:
+            - name: elasticsearch-certs
+              mountPath: /etc/certs
+              readOnly: true   
+  {{- end }}
+  {{- if .Values.fleet.enabled }}
+  config:
+    xpack.fleet.agents.elasticsearch.host: {{ .Values.fleet.agents.hosts.elasticsearchhost }}
+    xpack.fleet.agents.fleet_server.hosts: [{{ .Values.fleet.agents.hosts.fleetserverhost }}]
+  {{- end }}
+  {{- if .Values.kubernetes.integration.enabled }}
+    xpack.fleet.packages:
+    - name: kubernetes
+      # pinning this version as the next one introduced a kube-proxy host setting default that breaks this recipe,
+      # see https://github.com/elastic/integrations/pull/1565 for more details
+      version: 0.14.0
+    xpack.fleet.agentPolicies:
+    - name: Default Fleet Server on ECK policy
+      is_default_fleet_server: true
+      package_policies:
+      - package:
+          name: fleet_server
+        name: fleet_server-1
+    - name: Default Elastic Agent on ECK policy
+      is_default: true
+      unenroll_timeout: 900
+      package_policies:
+      - package:
+          name: system
+        name: system-1
+      - package:
+          name: kubernetes
+        name: kubernetes-1
+  {{- end}}

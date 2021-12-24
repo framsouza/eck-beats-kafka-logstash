@@ -1,0 +1,262 @@
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: {{ template "elasticsearch.uname" . }}
+spec:
+  version: {{ .Values.version }}
+  nodeSets:
+  {{- if .Values.dedicated.master.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-master
+    count: {{ .Values.replicas.master.count }}
+    config:
+      node.roles: ["master"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.master.requests }}
+              limits:
+                memory: {{ .Values.memory.master.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.master.size }}
+        storageClassName: {{ .Values.storage.master.classname }}
+  {{- end }}
+  ### If you don't want to have hot,cold,frozen dedicated node, you should enabled `dedicated.data` which will create a node with all data roles enabled
+  {{- if .Values.dedicated.data.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-data
+    count: {{ .Values.replicas.data.count }}
+    config:
+      node.roles: ["data"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.data.requests }}
+              limits:
+                memory: {{ .Values.memory.data.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.data.size }}
+        storageClassName: {{ .Values.storage.data.classname }}
+  {{- end }}
+  {{- if .Values.dedicated.datahot.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-hot
+    count: {{ .Values.replicas.datahot.count }}
+    config:
+      node.roles: ["data_hot", "data_content"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.datahot.requests }}
+              limits:
+                memory: {{ .Values.memory.datahot.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.datahot.size }}
+        storageClassName: {{ .Values.storage.datahot.classname }}
+  {{- end }}
+  {{- if .Values.dedicated.datawarm.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-warm
+    count: {{ .Values.replicas.datawarm.count }}
+    config:
+      node.roles: ["data_warm"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.datawarm.requests }}
+              limits:
+                memory: {{ .Values.memory.datawarm.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.datawarm.size }}
+        storageClassName: {{ .Values.storage.datawarm.classname }}
+  {{- end }}
+  {{- if .Values.dedicated.datacold.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-cold
+    count: {{ .Values.replicas.datacold.count }}
+    config:
+      node.roles: ["data_cold"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.datacold.requests }}
+              limits:
+                memory: {{ .Values.memory.datacold.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.datacold.size }}
+        storageClassName: {{ .Values.storage.datacold.classname }}
+  {{- end }}
+  {{- if .Values.dedicated.datafrozen.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-frozen
+    count: {{ .Values.replicas.datafrozen.count }}
+    config:
+      node.roles: ["data_frozen"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.datafrozen.requests }}
+              limits:
+                memory: {{ .Values.memory.datafrozen.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.datafrozen.size }}
+        storageClassName: {{ .Values.storage.datafrozen.classname }}
+  {{- end }}
+  {{- if .Values.dedicated.ingest.enabled }}
+  - name: {{ template "elasticsearch.uname" . }}-ingest
+    count: {{ .Values.replicas.ingest.count }}
+    config:
+      node.roles: ["ingest"]
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.ingest.requests }}
+              limits:
+                memory: {{ .Values.memory.ingest.limits }}
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data  # Do not change this name unless you set up a volume mount for the data path.
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.ingest.size }}
+        storageClassName: {{ .Values.storage.ingest.classname }}
+  {{- end }}
+  {{- if and (eq .Values.dedicated.datahot.enabled false) (eq .Values.dedicated.master.enabled false) (eq .Values.dedicated.datawarm.enabled false) (eq .Values.dedicated.datacold.enabled false) (eq .Values.dedicated.datafrozen.enabled false) (eq .Values.dedicated.ingest.enabled false) (eq .Values.dedicated.data.enabled false) }}
+  - name: {{ template "elasticsearch.uname" . }}
+    count: {{ .Values.replicasDefault }}
+    podTemplate:
+      spec:
+      {{- if .Values.sysctlInitContainer.enabled }}
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+       {{- end }}
+        containers:
+          - name: elasticsearch
+            resources:
+              requests:
+                memory: {{ .Values.memory.requests }}
+              limits:
+                memory: {{ .Values.memory.limits }}
+    volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.storageDefault.size }}
+            storageClassName: {{ .Values.storageDefault.classname }}
+  {{- end }}

@@ -1,0 +1,8 @@
+1. Watch all cluster members come up.
+  $ kubectl get pods --namespace={{ .Release.Namespace }} -l common.k8s.elastic.co/type=elasticsearch
+
+  $ kubectl get pods --namespace={{ .Release.Namespace }} -l common.k8s.elastic.co/type=kibana
+2. Check also the status of the Elasticsearch AND Kibana resource
+  $ kubectl get elasticsearch --namespace={{ .Release.Namespace }}
+
+  $ kubectl get kibana --namespace={{ .Release.Namespace }}

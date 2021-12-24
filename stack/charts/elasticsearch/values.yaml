@@ -1,0 +1,98 @@
+version: 7.16.1
+clusterName: elasticsearch
+
+nameOverride: ""
+fullnameOverride: ""
+
+# If you don't enabled any dedicated node, it will spin up nodes that contains all the roles
+replicasDefault: 1
+
+memory:
+  requests: 2Gi
+  limits: 2Gi
+
+storageDefault:
+  size: 10Gi
+  classname: standard
+
+sysctlInitContainer:
+  enabled: true
+
+# Dedicated nodes configuration, enable the roles and adjust the settings accordingly
+dedicated:
+  master:
+    enabled: false
+  data:
+    enabled: false
+  datahot:
+    enabled: false
+  datawarm:
+    enabled: false
+  datacold:
+    enabled: false
+  datafrozen:
+    enabled: false
+  ingest:
+    enabled: false
+
+replicas:
+  master:
+    count: 3
+  data:
+    count: 3
+  datahot: 
+    count: 3
+  datawarm:
+    count: 3
+  datacold:
+    count: 1
+  datafrozen:
+    count: 1
+  ingest:
+    count: 1
+
+memory:
+  master:
+    requests: 2Gi
+    limits: 2Gi
+  data:
+    requests: 2Gi
+    limits: 2Gi
+  datahot:
+    requests: 2Gi
+    limits: 2Gi
+  datawarm:
+    requests: 2Gi
+    limits: 2Gi
+  datacold:
+    requests: 2Gi
+    limits: 2Gi
+  datafrozen:
+    requests: 1Gi
+    limits: 1Gi
+  ingest:
+    requests: 2Gi
+    limits: 2Gi
+
+storage:
+  master:
+    size: 10Gi
+    classname: standard
+  data:
+    size: 50Gi
+    classname: standard
+  datahot:
+    size: 50Gi
+    classname: standard
+  datawarm:
+    size: 100Gi
+    classname: standard
+  datacold:
+    size: 100Gi
+    classname: standard
+  datafrozen:
+    size: 100Gi
+    classname: standard
+  ingest:
+    size: 10Gi
+    classname: standard

@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-multiple-pipeline
+data:
+  logstash.yml: |-
+    http.host: "0.0.0.0"
+  pipelines.yml: |-
+    - pipeline.id: app1
+      path.config: "/usr/share/logstash/pipeline/app1.config"
+    - pipeline.id: app2
+      path.config: "/usr/share/logstash/pipeline/app2.config"
+  app1.config: |-
+    input {
+      kafka {
+        codec => json
+        bootstrap_servers => "kafka-cluster-kafka-brokers:9092"
+        topics => ["app1"]
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => [ "${ES_HOSTS}" ]
+        user => "${ES_USER}"
+        password => "${ES_PASSWORD}"
+        cacert => '/etc/logstash/certificates/ca.crt'
+        index => "app1"
+      }
+    }
+
+  app2.config: |-
+    input {
+      kafka {
+        codec => json
+        bootstrap_servers => "kafka-cluster-kafka-brokers:9092"
+        topics => ["app2"]
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => [ "${ES_HOSTS}" ]
+        user => "${ES_USER}"
+        password => "${ES_PASSWORD}"
+        cacert => '/etc/logstash/certificates/ca.crt'
+        index => "app2"
+      }
+    }

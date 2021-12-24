@@ -1,0 +1,33 @@
+version: 7.16.1
+
+replicas: 1
+kibanaName: kibana
+
+nameOverride: ""
+fullnameOverride: ""
+
+kubernetes:
+  integration:
+    enabled: true
+
+elasticsearch:
+  ### If you are running Elasticsearch with ECK, keep this enabled, otherwise fill up the `kibanaSecretElasticsearchCredentials` & `elasticsearchEndpoint`
+  managedbyeck: true
+  name: elasticsearch
+  namespace: default
+  endpoint: ""
+  ### If you are connecting Kibana with a Elasticsearch running out of ECK and it's using a self-signed cert, enable the option below
+  certificate: 
+    enabled: false
+  ### Add here the secret name which contains the es certs
+  certs:
+    secret: ""
+  kibana:
+    secretcredentials: ""
+
+fleet:
+  enabled: true
+  agents:
+    hosts:
+      elasticsearchhost: "https://elasticsearch-es-http.default.svc:9200"
+      fleetserverhost: "https://fleet-server-agent-http.default.svc:8220"
