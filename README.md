@@ -1,10 +1,23 @@
-# Running Kafka with ECK, filebeat & logstash
-
+# Complex architecture running ECK, Kafka, logstash & beats
 _(WIP)_
 
-- Follow stack helm deployment instructions to deploy elasticsearch & kibana
-- helm add strimzi repo and install kafka operator
-- add kafka cluster and create topics via manifest
+On this page, you are going to learn how to configure beats on Kubernetes and use kafka + logstash to insert events on elasticsearch running on top of ECK.
+
+### Scenario
+- Kubernetes version 1.21 / ECK 1.9.1 / Elastic Stack 7.16.2 / Kafka 3.0.0
+- Beats running as a deployment to collect logs from 2 namespaces 
+- Beats sending output logs to two different kafka topics depending on the namespace
+- Kafka deployed by Strimzi (Kafka operator)
+- Kafka running with 3 brokers
+- 2 Kafka topics / app1 & app2 (both has 10 partitions)
+- Logstash running multiples pipelines where which one connects to different topic and send the events to elasticsearch
+- Logstash proper filter configured to be able to have kafka metadata fields added to the events
+
+### Deploying
+
+- Follow [stack helm deployment](https://github.com/framsouza/eck-resources-with-helm-charts) instructions to deploy elasticsearch & kibana
+- helm add [strimzi](https://strimzi.io/blog/2018/11/01/using-helm/) repo and install kafka operator
+- Once kafka operator was installed, apply [kafka.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/kafka.yaml) & [app1-topic.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/app1-topic.yaml) [app2-topic.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/app2-topic.yaml)
 - list kafka topics: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --list --bootstrap-server localhost:9092`
 - check events inside a topic: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic app1  --from-beginning`
 - check topics settings: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic app`
@@ -14,7 +27,8 @@ _(WIP)_
 ### Flow
 Filebeat (with autodiscovery and filtering by namespace) -> Kafka -> Logstash -> Elasticsearch
 
-## Partition Strategy
+## Settings to be considered
+### Partition Strategy
 
 Partition assingment define how client uses to distribute partition ownership amongst consumer instances. The default strategy is `range` which is ideally when you are consuming from *ONLY* one topic. 
 In some case when you are consuming from more than one topic, for instance `topic_pattern => app.*`, you may want to change this strategy to have a better distribution between partitions and consumer. Check the following scenario:
@@ -60,4 +74,41 @@ logstash        app1            5          9               9               0    
 - logstash 1 has 4 partitions assigned
 - logstash 2 has 3 partitions assigned
 
-Keep in mind on the examples above we are running 3 consumer_thread (logstash-0, logstash-1, logstash-2). The default is consumer_thread = 1. It means only one process will connect in every single partition, you might want to adjust it in order to improve the consumer performance. 
+### Consumer groups
+
+Keep in mind on the examples above we are running 3 consumer_thread (logstash-0, logstash-1, logstash-2). The default is `consumer_thread = 1`. It means only one process will connect in every single partition, you might want to adjust it in order to improve the consumer performance. 
+
+### Events consuming
+`max_poll_record` is responsible to collect the events from Kafka, by default it will collect 500 events by time. You might want to increase it to get better collection, it will also depending on the producer rate, but it's something you should evaluate and keep in mind.
+
+### Reingest events already processed by consumer / backfill missing data
+If for some reason you want to reinsert data into your cluster and noticed missing data, first you need to make sure you have a good retention period in your topic, by default kafka use 7 days of retention period. Once your data in the kafka cluster, you can use logstash to collect these events.
+To do so, before anything you need to have the following configuration in your kafka input `decorate_events => basic` it will add the metadata into the events. Then, you need to add the mutate filter into the game to be able to add these metadata into the output event:
+
+```
+
+    filter {
+      mutate{
+        add_field => { "[topic]" => "%{[@metadata][kafka][topic]}"}
+        add_field => { "[consumer_group]" => "%{[@metadata][kafka][consumer_group]}"}
+        add_field => { "[partition]" => "%{[@metadata][kafka][partition]"}
+        add_field => { "[offset]" => "%{[@metadata][kafka][offset]}"}
+      }
+    }
+```
+Checking the data into elasticsearch, you will see 4 new fields was added: `topic, consumer_group, partition, offset`.
+With that you have kafka input properly configured to be able to re-insert data. Next steps:
+
+1. Create a new consumer_group listening to the same topic
+2. Setting the `auto_offset_reset` to `earliest` to retrieve old data from topics
+3. Configure the following filter to drop any duplicated data you might have
+```
+  if [@metadata][kafka][offset] < MIN_OFFSET or [@metadata][kafka][offset] > MAX_OFFSET {
+    drop {}
+  }
+```
+
+With that, you are checking the offset to check which one was the last one commited and reingest it from there.
+
+
+
