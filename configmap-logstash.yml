@@ -13,9 +13,21 @@ data:
   app1.config: |-
     input {
       kafka {
+        client_id => "app1"
         codec => json
+        decorate_events => basic
+        consumer_threads => 10
         bootstrap_servers => "kafka-cluster-kafka-brokers:9092"
         topics => ["app1"]
+      }
+    }
+
+    filter {
+      mutate{
+        add_field => { "[topic]" => "%{[@metadata][kafka][topic]}"}
+        add_field => { "[consumer_group]" => "%{[@metadata][kafka][consumer_group]}"}
+        add_field => { "[partition]" => "%{[@metadata][kafka][partition]"}
+        add_field => { "[offset]" => "%{[@metadata][kafka][offset]}"}
       }
     }
 
@@ -32,9 +44,21 @@ data:
   app2.config: |-
     input {
       kafka {
+        client_id => "app2"
         codec => json
+        decorate_events => basic
+        consumer_threads => 10
         bootstrap_servers => "kafka-cluster-kafka-brokers:9092"
         topics => ["app2"]
+      }
+    }
+
+    filter {
+      mutate{
+        add_field => { "[topic]" => "%{[@metadata][kafka][topic]}"}
+        add_field => { "[consumer_group]" => "%{[@metadata][kafka][consumer_group]}"}
+        add_field => { "[partition]" => "%{[@metadata][kafka][partition]"}
+        add_field => { "[offset]" => "%{[@metadata][kafka][offset]}"}
       }
     }
 

@@ -62,3 +62,17 @@ spec:
       - name: cert-ca
         secret:
           secretName: elasticsearch-es-http-certs-public
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: logstash
+  name: logstash
+spec:
+  ports:
+  - name: "logstash"
+    port: 5044
+    targetPort: 5044
+  selector:
+    app: logstash

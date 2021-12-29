@@ -20,26 +20,19 @@ spec:
       type: kubernetes
       hints.default_config.enabled: "false"
       templates:
-      - condition.equals.kubernetes.namespace: app1
-        config:
-        - paths: ["/var/log/containers/*${data.kubernetes.container.id}.log"]
-          type: container
-      - condition.equals.kubernetes.labels.log-label: "true"
-        config:
-        - paths: ["/var/log/containers/*${data.kubernetes.container.id}.log"]
-          type: container
-      - condition.equals.kubernetes.namespace: app2
-        config:
-        - paths: ["/var/log/containers/*${data.kubernetes.container.id}.log"]
-          type: container
-      - condition.equals.kubernetes.labels.log-label: "true"
-        config:
-        - paths: ["/var/log/containers/*${data.kubernetes.container.id}.log"]
-          type: container
+        - condition:
+            or:
+              - equals:
+                  kubernetes.namespace: "app1"
+              - equals:
+                  kubernetes.namespace: "app2"
+          config:
+          - paths: ["/var/log/containers/*${data.kubernetes.container.id}.log"]
+            type: container
     processors:
     - add_cloud_metadata: {}
     - add_host_metadata: {}
-  daemonSet:
+  deployment:
     podTemplate:
       spec:
         serviceAccountName: filebeat
