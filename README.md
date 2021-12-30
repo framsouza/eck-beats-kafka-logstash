@@ -26,7 +26,12 @@ Let assume you have a Kubernetes environment with `n` namespaces and there are 2
 
 
 ### Flow
-Filebeat (with autodiscovery and filtering by namespace) -> Kafka <- Logstash -> Elasticsearch
+Filebeat (with autodiscovery and filtering by namespace) -> Kafka <- Logstash -> Elasticsearch.
+
+High level architecture
+
+![Image from iOS](https://user-images.githubusercontent.com/16880741/147740761-1df66d41-6c84-49ea-ae96-3d6eb2d9894d.jpg)
+
 
 ## Settings to be considered
 ### Partition Strategy
