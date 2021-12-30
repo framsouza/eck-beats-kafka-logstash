@@ -2,6 +2,7 @@
 _(WIP)_
 
 On this page, you are going to learn how to configure beats on Kubernetes and use kafka + logstash to insert events on elasticsearch running on top of ECK.
+Let assume you have a Kubernetes environment with `n` namespaces and there are 2 namespaces which you have to send the output to two differents topic on Kafka. You also need separates pipelines to process these data and insert into two differents indices on Elasticsearch.
 
 ### Scenario
 - Kubernetes version 1.21 / ECK 1.9.1 / Elastic Stack 7.16.2 / Kafka 3.0.0
@@ -17,20 +18,21 @@ On this page, you are going to learn how to configure beats on Kubernetes and us
 
 - Follow [stack helm deployment](https://github.com/framsouza/eck-resources-with-helm-charts) instructions to deploy elasticsearch & kibana
 - helm add [strimzi](https://strimzi.io/blog/2018/11/01/using-helm/) repo and install kafka operator
-- Once kafka operator was installed, apply [kafka.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/kafka.yaml) & [app1-topic.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/app1-topic.yaml) [app2-topic.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/app2-topic.yaml)
-- list kafka topics: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --list --bootstrap-server localhost:9092`
-- check events inside a topic: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic app1  --from-beginning`
-- check topics settings: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic app`
-- check consumer group list: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list`
-- check consumer id by one consumer group: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group logstash`
+- Once kafka operator was installed, apply [kafka.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/kafka.yaml) & [app1-topic.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/app1-topic.yaml), [app2-topic.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/app2-topic.yaml). It will create a Kafka cluster with 3 brokers and 2 topics (10 partitions each)
+- The [banana-app.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/banana-app.yaml) will run on ns `app1`, and [apple-app.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/apple-app.yaml) will run on ns `app2`, apply both manifests.
+- Use a port-forward to be able to access theses application via browser, once you access it at this point you should have received messages in the kafka topics.
+- Deploy beats, it will run a deployment because on this scenario there's no needed to run it as daemonset. It's using a autodiscovery feature and also collecting events from only 2 namespaces. 
+- Take a look in the [configmap-logstash.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/configmap-logstash.yml) this is how our multitiple pipeline on logstash is configured. 
+- Apply the configmap-logstash.yaml and right after that apply the [logstash.yml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/logstash.yml) deployment
+
 
 ### Flow
-Filebeat (with autodiscovery and filtering by namespace) -> Kafka -> Logstash -> Elasticsearch
+Filebeat (with autodiscovery and filtering by namespace) -> Kafka <- Logstash -> Elasticsearch
 
 ## Settings to be considered
 ### Partition Strategy
 
-Partition assingment define how client uses to distribute partition ownership amongst consumer instances. The default strategy is `range` which is ideally when you are consuming from *ONLY* one topic. 
+Partition assingment define how client uses to distribute partition ownership amongst consumer instances. The default strategy is `range` which is ideally when you are consuming from *ONLY* one topic as per Kafka documentation: `The range assignor works on a per-topic basis.For each topic,….`.
 In some case when you are consuming from more than one topic, for instance `topic_pattern => app.*`, you may want to change this strategy to have a better distribution between partitions and consumer. Check the following scenario:
 
 2 Topics:
@@ -111,4 +113,10 @@ With that you have kafka input properly configured to be able to re-insert data.
 With that, you are checking the offset to check which one was the last one commited and reingest it from there.
 
 
+### Useful commands to troubleshooting
 
+- list kafka topics: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --list --bootstrap-server localhost:9092`
+- check events inside a topic: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic app1  --from-beginning`
+- check topics settings (retention period): `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic app`
+- check consumer group list: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list`
+- check consumer id by one consumer group: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group logstash`
