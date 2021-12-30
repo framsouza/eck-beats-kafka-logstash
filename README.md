@@ -33,62 +33,36 @@ Filebeat (with autodiscovery and filtering by namespace) -> Kafka <- Logstash ->
 ### Partition Strategy
 
 Partition assingment define how client uses to distribute partition ownership amongst consumer instances. The default strategy is `range` which is ideally when you are consuming from *ONLY* one topic as per Kafka documentation: `The range assignor works on a per-topic basis.For each topic,….`.
-In some case when you are consuming from more than one topic, for instance `topic_pattern => app.*`, you may want to change this strategy to have a better distribution between partitions and consumer. Check the following scenario:
+In some case when you are consuming from more than one topic, for instance `topic_pattern => app.*`, you may want to change this strategy to have a better distribution between partitions and consumer.
 
-2 Topics:
-- app1 has 8 partitions
-- app2 has 2 partitions
+To check how the consumer clients are consuming the partitions, you can use the following command: `kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group logstash`
 
-1 Consumer group running with 3 consumer_thread and 1 logstash intance. Using the default strategy, the distribution will be the following:
+Whenever a consumer enters or leaves a consumer group, the brokers rebalance the partitions across consumers, meaning Kafka handles load balancing with respect to the number of partitions per application instance for you. By default, when a rebalance happens, all consumers drop their partitions and are reassigned new ones (which is called the “eager” protocol). To reduce this partition shuffling on stateful services, you can use the `sticky` strategy. This assignor makes some attempt to keep partition numbers assigned to the same instance, as long as they remain in the group, while still evenly distributing the partitions across members
 
-```
-GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                     HOST            CLIENT-ID
-logstash        app1            0          39              39              0               logstash-0-43df8a06-b36d-42da-976b-f0493571e46b /10.0.1.71      logstash-0
-logstash        app2            0          10              10              0               logstash-0-43df8a06-b36d-42da-976b-f0493571e46b /10.0.1.71      logstash-0
-logstash        app1            1          13              13              0               logstash-0-43df8a06-b36d-42da-976b-f0493571e46b /10.0.1.71      logstash-0
-logstash        app1            2          8               8               0               logstash-0-43df8a06-b36d-42da-976b-f0493571e46b /10.0.1.71      logstash-0
-logstash        app2            1          7               7               0               logstash-1-32199444-c97d-4b49-9c65-d7400e0c628a /10.0.1.71      logstash-1
-logstash        app1            3          3               3               0               logstash-1-32199444-c97d-4b49-9c65-d7400e0c628a /10.0.1.71      logstash-1
-logstash        app1            4          8               8               0               logstash-1-32199444-c97d-4b49-9c65-d7400e0c628a /10.0.1.71      logstash-1
-logstash        app1            5          9               9               0               logstash-1-32199444-c97d-4b49-9c65-d7400e0c628a /10.0.1.71      logstash-1
-logstash        app1            6          5               5               0               logstash-2-776a1d2f-5e39-4e86-a0d1-6a4c04e9509c /10.0.1.71      logstash-2
-```
-- logstash 0 has 4 partitions assigned
-- logstash 1 has 4 partitions assigned
-- logstash 2 has 1 partitions assigned
+It's depends on your currently configuration, but keep in mind about the strategy it's best for your usecase.
 
-Changing partition strategy to use `round_robin`:
-```
-GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                     HOST            CLIENT-ID
-logstash        app3            0          0               0               0               logstash-1-89c80e91-2382-4675-8129-147cc5f5e3fb /10.0.1.72      logstash-1
-logstash        app1            1          13              13              0               logstash-1-89c80e91-2382-4675-8129-147cc5f5e3fb /10.0.1.72      logstash-1
-logstash        app1            4          8               8               0               logstash-1-89c80e91-2382-4675-8129-147cc5f5e3fb /10.0.1.72      logstash-1
-logstash        app1            7          12              12              0               logstash-1-89c80e91-2382-4675-8129-147cc5f5e3fb /10.0.1.72      logstash-1
-logstash        app1            0          39              39              0               logstash-0-42091b96-43a7-41e0-ac7f-709067b560ab /10.0.1.72      logstash-0
-logstash        app2            1          7               7               0               logstash-0-42091b96-43a7-41e0-ac7f-709067b560ab /10.0.1.72      logstash-0
-logstash        app1            3          3               3               0               logstash-0-42091b96-43a7-41e0-ac7f-709067b560ab /10.0.1.72      logstash-0
-logstash        app1            6          5               5               0               logstash-0-42091b96-43a7-41e0-ac7f-709067b560ab /10.0.1.72      logstash-0
-logstash        app2            0          10              10              0               logstash-2-96de7e2f-1827-4676-9b93-e0a3a291d2fe /10.0.1.72      logstash-2
-logstash        app1            2          8               8               0               logstash-2-96de7e2f-1827-4676-9b93-e0a3a291d2fe /10.0.1.72      logstash-2
-logstash        app1            5          9               9               0               logstash-2-96de7e2f-1827-4676-9b93-e0a3a291d2fe /10.0.1.72      logstash-2
-```
-- logstash 0 has 4 partitions assigned
-- logstash 1 has 4 partitions assigned
-- logstash 2 has 3 partitions assigned
+### Rebalance
+
+There are cases where you may see a lot of rebalance in your consumer. There are some scenarios where the rebalance is triggered:
+1. When you change the number of partition of a topic (add or remove)
+2. When your kafka cluster is overloaded and can handle the current load
+3. When you add (or remove) consumers into the consumer group
+4. When a consumer is considered dead
+
+To handle #4 you should investigate the heartbeats in your logstash kafka input, also `max_poll_interval` which is the amount of time the consumer can be idle before fetching more records, also `session_timeout_ms` is a good one to adjust in case you have to wait more before tag the consumer as unavailable. 
 
 ### Consumer groups
 
-Keep in mind on the examples above we are running 3 consumer_thread (logstash-0, logstash-1, logstash-2). The default is `consumer_thread = 1`. It means only one process will connect in every single partition, you might want to adjust it in order to improve the consumer performance. 
+The default is `consumer_thread = 1`. It means only one process will connect in every single partition, you might want to adjust it in order to improve the consumer performance. It's highly recommend to use the same number of partition, which means each consumer group will connect in one partition to collect the data. Using the dedafult configuration, means that only 1 consumer will connect in ALL the partitions to collect the events.
 
 ### Events consuming
-`max_poll_record` is responsible to collect the events from Kafka, by default it will collect 500 events by time. You might want to increase it to get better collection, it will also depending on the producer rate, but it's something you should evaluate and keep in mind.
+`max_poll_record` is responsible to collect the events from Kafka, by default it will collect 500 events by time. How much kafka fetches on each round trip will depends on `fetch_max_bytes`. If you adjust `max_poll_record` to collect more data (e.g 1000) means that logstash input waits longer for data before pushing it further down the pipeline. These adjustments will depending on the producer rate, but it's something you should evaluate and keep in mind.
 
 ### Reingest events already processed by consumer / backfill missing data
 If for some reason you want to reinsert data into your cluster and noticed missing data, first you need to make sure you have a good retention period in your topic, by default kafka use 7 days of retention period. Once your data in the kafka cluster, you can use logstash to collect these events.
 To do so, before anything you need to have the following configuration in your kafka input `decorate_events => basic` it will add the metadata into the events. Then, you need to add the mutate filter into the game to be able to add these metadata into the output event:
 
 ```
-
     filter {
       mutate{
         add_field => { "[topic]" => "%{[@metadata][kafka][topic]}"}
@@ -112,7 +86,6 @@ With that you have kafka input properly configured to be able to re-insert data.
 
 With that, you are checking the offset to check which one was the last one commited and reingest it from there.
 
-
 ### Useful commands to troubleshooting
 
 - list kafka topics: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --list --bootstrap-server localhost:9092`
@@ -120,3 +93,5 @@ With that, you are checking the offset to check which one was the last one commi
 - check topics settings (retention period): `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic app`
 - check consumer group list: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list`
 - check consumer id by one consumer group: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group logstash`
+
+Happy Kafka! 
