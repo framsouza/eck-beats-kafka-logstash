@@ -23,7 +23,6 @@ Let assume you have a Kubernetes environment with `n` namespaces and there are 2
 - Deploy beats, it will run a deployment because in this scenario there's no need to run it as daemonset. It's using an autodiscovery feature and also collects events from only 2 namespaces. 
 - Take a look in the [configmap-logstash.yaml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/configmap-logstash.yml) this is how our multiple pipelines on logstash is configured. 
 - Apply the configmap-logstash.yaml and right after that apply the [logstash.yml](https://github.com/framsouza/eck-beats-kafka-logstash/blob/main/logstash.yml) deployment
-- Check how many events is there inside a toopic, `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list localhost:9092 --topic apple | awk -F  ":" '{sum += $3} END {print sum}'`
 
 
 ### Flow
@@ -98,5 +97,6 @@ With that, you are checking the offset to check which one was the last one commi
 - check topics settings (retention period): `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic app`
 - check consumer group list: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list`
 - check consumer id by one consumer group: `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group logstash`
+- check how many events is there inside a toopic, `kubectl exec kafka-cluster-kafka-0 -- bin/kafka-run-class.sh kafka.tools.GetOffsetShell --broker-list localhost:9092 --topic apple | awk -F  ":" '{sum += $3} END {print sum}'`
 
 Happy Kafka! 
